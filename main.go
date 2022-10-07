@@ -65,7 +65,7 @@ func login(c *gin.Context) {
 
 	collection := client.Database("test").Collection("users")
 
-	filter := bson.M{"username": user.Username, "password": user.Password}
+	filter := bson.M{"email": user.Username, "password": user.Password}
 
 	err = collection.FindOne(context.Background(), filter).Decode(&user)
 	if err != nil {
@@ -130,7 +130,7 @@ func user(c *gin.Context) {
 func createToken(username string) string {
 	claims := jwt.MapClaims{}
 	claims["authorized"] = true
-	claims["username"] = username
+	claims["email"] = username
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, _ := token.SignedString([]byte(os.Getenv("SECRET")))
 	return tokenString
