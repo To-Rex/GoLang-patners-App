@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -243,5 +244,7 @@ func createToken(username string) string {
 	claims["username"] = username
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, _ := token.SignedString([]byte(os.Getenv("SECRET")))
-	return tokenString
+	//return tokenString 36: all
+	str := tokenString[36:len(tokenString)]
+	return str
 }
