@@ -21,6 +21,9 @@ const uri = "mongodb+srv://root:1234@cluster0.ik76ncs.mongodb.net/?retryWrites=t
 type User struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Name    string `json:"name"`
+	Age     int    `json:"age"`
+	Email   string `json:"email"`
 	Token	string `json:"token"`
 }
 
@@ -50,7 +53,7 @@ func login(c *gin.Context) {
 		fmt.Println(err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, _:= context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
@@ -164,7 +167,7 @@ func users(c *gin.Context) {
 		fmt.Println(err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Microsecond)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
@@ -176,7 +179,7 @@ func users(c *gin.Context) {
 	}
 
 	collection := client.Database("test").Collection("users")
-
+	
 	cursor, err := collection.Find(context.Background(), bson.M{})
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
@@ -187,9 +190,9 @@ func users(c *gin.Context) {
 		var user User
 		cursor.Decode(&user)
 		users = append(users, user)
-
 	}
 	c.JSON(http.StatusOK, users)
+
 }
 
 func updateuser(c *gin.Context) {
