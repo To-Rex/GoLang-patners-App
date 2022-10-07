@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -244,7 +245,5 @@ func createToken(username string) string {
 	claims["username"] = username
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, _ := token.SignedString([]byte(os.Getenv("SECRET")))
-	//return tokenString 36: all
-	str := tokenString[36:len(tokenString)]
-	return str
+	return strings.Split(tokenString, ".")[1]
 }
