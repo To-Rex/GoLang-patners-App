@@ -189,6 +189,14 @@ func users(c *gin.Context) {
 	for cursor.Next(context.Background()) {
 		var user User
 		cursor.Decode(&user)
+		user = User{
+			Username: user.Username,
+			Password: user.Password,
+			Name:     user.Name,
+			Age:      user.Age,
+			Email:    user.Email,
+		}
+		
 		users = append(users, user)
 
 	}
