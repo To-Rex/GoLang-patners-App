@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
-
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -37,12 +35,11 @@ func main() {
 	r := gin.Default()
 	r.POST("/login", login)
 	r.POST("/register", register)
-	//r.GET("/getuser", user)
+	r.GET("/getuser", user)
 	//r.GET("/getusers", users)
 	//r.PUT("/updateuser", updateuser)
 	r.Run()
 }
-
 
 func login(c *gin.Context) {
 	var user User
@@ -80,7 +77,6 @@ func login(c *gin.Context) {
 	c.JSON(http.StatusOK, token)
 }
 
-
 func register(c *gin.Context) {
 	var user User
 	c.BindJSON(&user)
@@ -102,7 +98,32 @@ func register(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User created successfully!", "data": user})
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK,"Token": user.Token})
+}
+
+func user(c *gin.Context) {
+	var user User
+	var token Token
+	c.BindJSON(&token)
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer client.Disconnect(ctx)
+	collection := client.Database("test").Collection("users")
+	ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+	filter := bson.M{"token": token.Token}
+	err = collection.FindOne(context.Background(), filter).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }
 
 
@@ -112,5 +133,5 @@ func createToken(username string) string {
 	claims["username"] = username
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, _ := token.SignedString([]byte(os.Getenv("SECRET")))
-	return strings.Split(tokenString, ".")[1]
+	return tokenString
 }
