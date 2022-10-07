@@ -3,28 +3,26 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"os"
-	"time"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"net/http"
+	"os"
+	"time"
 )
 
-
 const uri = "mongodb+srv://root:1234@cluster0.ik76ncs.mongodb.net/?retryWrites=true&w=majority"
-
 
 type User struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
-	Name    string `json:"name"`
-	Age     int    `json:"age"`
-	Email   string `json:"email"`
-	Token	string `json:"token"`
+	Name     string `json:"name"`
+	Age      int    `json:"age"`
+	Email    string `json:"email"`
+	Token    string `json:"token"`
 }
 
 type Token struct {
@@ -36,7 +34,7 @@ func main() {
 	r.POST("/login", login)
 	r.POST("/register", register)
 	r.GET("/getuser", user)
-	//r.GET("/getusers", users)
+	r.GET("/getusers", users)
 	//r.PUT("/updateuser", updateuser)
 	r.Run()
 }
@@ -98,34 +96,104 @@ func register(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK,"Token": user.Token})
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "Token": user.Token})
 }
 
+
 func user(c *gin.Context) {
+	token := c.Request.Header.Get("Authorization")
+	token = token[7:len(token)]
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("SECRET")), nil
+	})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
 	var user User
-	var token Token
-	c.BindJSON(&token)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		fmt.Println(err)
 	}
+
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer client.Disconnect(ctx)
+
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	collection := client.Database("test").Collection("users")
-	ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
-	filter := bson.M{"token": token.Token}
+
+	filter := bson.M{"username": claims["username"]}
 	err = collection.FindOne(context.Background(), filter).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
+	user = User{
+		Username: user.Username,
+		Password: user.Password,
+		Name:     user.Name,
+		Age:      user.Age,
+		Email:    user.Email,
+	}
+
 	c.JSON(http.StatusOK, user)
+
 }
 
+
+func users(c *gin.Context) {
+	token := c.Request.Header.Get("Authorization")
+	token = token[7:len(token)]
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("SECRET")), nil
+	})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+	var users []User
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	collection := client.Database("test").Collection("users")
+
+	cursor, err := collection.Find(context.Background(), bson.M{})
+	//a := cursor.All(context.Background(), &users)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
+	for cursor.Next(context.Background()) {
+		var user User
+		cursor.Decode(&user)
+		users = append(users, user)
+
+	}
+	c.JSON(http.StatusOK, users)
+}
 
 func createToken(username string) string {
 	claims := jwt.MapClaims{}
