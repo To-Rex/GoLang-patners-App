@@ -35,6 +35,7 @@ func main() {
 	r.POST("/register", register)
 	r.GET("/getuser", user)
 	r.GET("/getusers", users)
+	r.DELETE("/deleteuser", deleteUser)
 	//r.PUT("/updateuser", updateuser)
 	r.Run()
 }
@@ -180,7 +181,6 @@ func users(c *gin.Context) {
 	collection := client.Database("test").Collection("users")
 
 	cursor, err := collection.Find(context.Background(), bson.M{})
-	//a := cursor.All(context.Background(), &users)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
@@ -201,6 +201,44 @@ func users(c *gin.Context) {
 
 	}
 	c.JSON(http.StatusOK, users)
+}
+
+func deleteUser(c *gin.Context) {
+	token := c.Request.Header.Get("Authorization")
+	token = token[7:len(token)]
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("SECRET")), nil
+	})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	collection := client.Database("test").Collection("users")
+
+	filter := bson.M{"username": claims["username"]}
+	_, err = collection.DeleteOne(context.Background(), filter)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User deleted"})
 }
 
 func createToken(username string) string {
