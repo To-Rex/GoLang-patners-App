@@ -9,38 +9,24 @@ import (
 	  twilioApi "github.com/twilio/twilio-go/rest/api/v2010"
   )
 
-func main() {
-	msg := "Hello world"
-	phone := "+998909999999"
+  func sendsms() {
+	  client := twilio.NewRestClient("ACc7e0d8c4e4b4f0e2c7f3b9d2c7b0e3b3", "e3e8d0e1c1c6e1a2b3d8b2b3c4d5e6f7")
+	  params := &twilioApi.MessageCreateParams{
+		  Body: "Hello from Twilio!",
+		  To:   "+998909999999",
+		  From: "+12058999999",
+	  }
+  
+	  resp, err := client.Messages.Create(params)
+	  if err != nil {
+		  fmt.Println(err)
+	  }
+  
+	  fmt.Println(resp.Sid)
+  }
 
-	// Create a new Twilio client
-	client := twilio.NewClient(os.Getenv("TWILIO_ACCOUNT_SID"), os.Getenv("TWILIO_AUTH_TOKEN"), nil)
-
-	// Send a message
-	message, err := client.Messages.Create(twilioApi.MessageCreateParams{
-		Body: &msg,
-		To:   &phone,
-		From: &os.Getenv("TWILIO_PHONE_NUMBER"),
-	})
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	// Print the response
-	b, _ := json.MarshalIndent(message, "", "  ")
-	fmt.Println(string(b))
-
-	var code string
-	fmt.Scanln(&code)
-
-	// Verify the code
-	verification, err := client.Verify.Services(os.Getenv("TWILIO_VERIFY_SERVICE_SID")).VerificationChecks.Create(twilioApi.VerificationCheckCreateParams{
-		To:   &phone,
-		Code: &code,
-	})
-	if err != nil {
-		fmt.Println(err)
-	}
-	
-}
+  func main() {
+	  sendsms()
+  }
+  
 
