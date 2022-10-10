@@ -35,6 +35,12 @@ func main() {
 
 	// Verify the code
 	verification, err := client.Verify.Services(os.Getenv("TWILIO_VERIFY_SERVICE_SID")).VerificationChecks.Create(twilioApi.VerificationCheckCreateParams{
-		
+		To:   &phone,
+		Code: &code,
+	})
+	if err != nil {
+		fmt.Println(err)
+	}
+	
 }
 
