@@ -29,5 +29,12 @@ func main() {
 	// Print the response
 	b, _ := json.MarshalIndent(message, "", "  ")
 	fmt.Println(string(b))
+
+	var code string
+	fmt.Scanln(&code)
+
+	// Verify the code
+	verification, err := client.Verify.Services(os.Getenv("TWILIO_VERIFY_SERVICE_SID")).VerificationChecks.Create(twilioApi.VerificationCheckCreateParams{
+		
 }
 
