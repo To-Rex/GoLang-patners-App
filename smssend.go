@@ -25,6 +25,9 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	
+
+	// Print the response
+	b, _ := json.MarshalIndent(message, "", "  ")
+	fmt.Println(string(b))
 }
 
