@@ -10,29 +10,21 @@ import (
   )
 
 func main() {
-	// Your Account SID from twilio.com/console
-	accountSid := "ACd7d3e0b9c9a9a1a1d7d3e0b9c9a9a1a1"
-	// Your Auth Token from twilio.com/console
-	authToken := "your_auth_token"
+	msg := "Hello world"
+	phone := "+998909999999"
 
-	// Twilio client
-	client := twilio.NewClient(accountSid, authToken, nil)
+	// Create a new Twilio client
+	client := twilio.NewClient(os.Getenv("TWILIO_ACCOUNT_SID"), os.Getenv("TWILIO_AUTH_TOKEN"), nil)
 
-	// Create message
-	params := &twilioApi.MessageCreateParams{
-		Body: "Hello from Go!",
-		To:   "+12345678901",
-		From: "+12345678901",
-	}
-
-	// Send message
-	message, err := client.Messages.Create(params)
+	// Send a message
+	message, err := client.Messages.Create(twilioApi.MessageCreateParams{
+		Body: &msg,
+		To:   &phone,
+		From: &os.Getenv("TWILIO_PHONE_NUMBER"),
+	})
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	// Print message
-	json, _ := json.MarshalIndent(message, "", "  ")
-	fmt.Println(string(json))
+	
 }
 
