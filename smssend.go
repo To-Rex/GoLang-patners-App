@@ -8,30 +8,31 @@ import (
 	  "github.com/twilio/twilio-go"
 	  twilioApi "github.com/twilio/twilio-go/rest/api/v2010"
   )
-  
-  func main() {
-	  accountSid := "ACa6ae4e7a6b6a088a86d90141bef73b59"
-	  authToken := "MIAsTTrWFQSBLRlQwrJtNp0hkytJfoSzPEJ9iuCh"
-  
-	  client := twilio.NewRestClientWithParams(twilio.ClientParams{
-		  Username: accountSid,
-		  Password: authToken,
-	  })
-  
 
+func main() {
+	// Your Account SID from twilio.com/console
+	accountSid := "ACd7d3e0b9c9a9a1a1d7d3e0b9c9a9a1a1"
+	// Your Auth Token from twilio.com/console
+	authToken := "your_auth_token"
 
+	// Twilio client
+	client := twilio.NewClient(accountSid, authToken, nil)
 
-	  
-	  params := &twilioApi.CreateMessageParams{}
-	  params.SetTo("+998995340313")
-	  params.SetFrom("+15017250604")
-	  params.SetBody("Hello from Go!")
-  
-	  resp, err := client.Api.CreateMessage(params)
-	  if err != nil {
-		  fmt.Println(err.Error())
-	  } else {
-		  response, _ := json.Marshal(*resp)
-		  fmt.Println("Response: " + string(response))
-	  }
-  }
+	// Create message
+	params := &twilioApi.MessageCreateParams{
+		Body: "Hello from Go!",
+		To:   "+12345678901",
+		From: "+12345678901",
+	}
+
+	// Send message
+	message, err := client.Messages.Create(params)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Print message
+	json, _ := json.MarshalIndent(message, "", "  ")
+	fmt.Println(string(json))
+}
+
