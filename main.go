@@ -1,257 +1,193 @@
 package main
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"github.com/dgrijalva/jwt-go"
-// 	"github.com/gin-gonic/gin"
-// 	"go.mongodb.org/mongo-driver/bson"
-// 	"go.mongodb.org/mongo-driver/mongo"
-// 	"go.mongodb.org/mongo-driver/mongo/options"
-// 	"go.mongodb.org/mongo-driver/mongo/readpref"
-// 	"net/http"
-// 	"os"
-// 	"time"
-// )
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"net/http"
+	"os"
+	"time"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+	"golang.org/x/crypto/bcrypt"
+)
 
-// const uri = "mongodb+srv://root:1234@cluster0.ik76ncs.mongodb.net/?retryWrites=true&w=majority"
+const uri = "mongodb+srv://root:1234@cluster0.ik76ncs.mongodb.net/?retryWrites=true&w=majority"
 
-// type User struct {
-// 	Username string `json:"username"`
-// 	Password string `json:"password"`
-// 	Name     string `json:"name"`
-// 	Age      int    `json:"age"`
-// 	Email    string `json:"email"`
-// 	Token    string `json:"token"`
-// }
+type User struct {
+	Name	 string `json:"name"`
+	Surname  string `json:"surname"`
+	Years	 int	`json:"years"`
+	Phone	 string `json:"phone"`
+	Country string `json:"country"`
+	Email	 string `json:"email"`
+	Password string `json:"password"`
+	RegisterDate string `json:"register_date"`
+	Money   int	`json:"money"`
+	Promocode string `json:"promocode"`
+	Verified bool `json:"verified"`
+	Blocked bool `json:"blocked"`
+	Token string `json:"token"`
+	UserId string `json:"user_id"`
+	UserStatus string `json:"user_status"`
+	UserRole string `json:"user_role"`
+	UserAvatar string `json:"user_avatar"`
+	Wallet string `json:"wallet"`
+}
 
-// type Token struct {
-// 	Token string `json:"token"`
-// }
+type Transaction struct {
+	TransactionId string `json:"transaction_id"`
+	TransactionDate string `json:"transaction_date"`
+	TransactionType string `json:"transaction_type"`
+	TransactionAmount int `json:"transaction_amount"`
+	TransactionStatus string `json:"transaction_status"`
+	TransactionCurrency string `json:"transaction_currency"`
+	TransactionDescription string `json:"transaction_description"`
+	TransactionUserId string `json:"transaction_user_id"`
+}
 
-// func main() {
-// 	r := gin.Default()
-// 	r.POST("login", login)
-// 	r.POST("register", register)
-// 	r.GET("getuser", user)
-// 	r.GET("getusers", users)
-// 	r.DELETE("deleteuser", deleteUser)
-// 	r.Run(":8080")
-// }
+type Product struct {
+	ProductId string `json:"product_id"`
+	ProductName string `json:"product_name"`
+	ProductDescription string `json:"product_description"`
+	ProductPrice int `json:"product_price"`
+	ProductCurrency string `json:"product_currency"`
+	ProductImage string `json:"product_image"`
+	ProductCategory string `json:"product_category"`
+	ProductStatus string `json:"product_status"`
+	ProductUserId string `json:"product_user_id"`
+}
 
-// func register(c *gin.Context) {
-// 	var user User
-// 	c.BindJSON(&user)
-// 	user.Token = createToken(user.Username)
-// 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-// 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-// 	err = client.Connect(ctx)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-// 	defer client.Disconnect(ctx)
-// 	collection := client.Database("test").Collection("users")
-// 	ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
+type Order struct {
+	OrderId string `json:"order_id"`
+	OrderDate string `json:"order_date"`
+	OrderStatus string `json:"order_status"`
+	OrderUserId string `json:"order_user_id"`
+	OrderProductId string `json:"order_product_id"`
+	OrderProductAmount int `json:"order_product_amount"`
+	OrderProductPrice int `json:"order_product_price"`
+	OrderProductCurrency string `json:"order_product_currency"`
+}
 
-// 	_, err = collection.InsertOne(ctx, user)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-// 	c.JSON(http.StatusOK, gin.H{"Token": user.Token})
-// }
+func main() {
+	router := gin.Default()
+	router.POST("/register", register)
+	router.Run(":8080")
+}
 
-// func user(c *gin.Context) {
-// 	token := c.Request.Header.Get("Authorization")
-// 	token = token[7:len(token)]
-// 	claims := jwt.MapClaims{}
-// 	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-// 		return []byte(os.Getenv("SECRET")), nil
-// 	})
-// 	if err != nil {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-// 		return
-// 	}
-// 	var user User
-// 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
+func createToken(username string) string {
+	claims := jwt.MapClaims{}
+	claims["authorized"] = true
+	claims["email"] = username
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, _ := token.SignedString([]byte(os.Getenv("SECRET")))
+	return tokenString
+}
 
-// 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-// 	err = client.Connect(ctx)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
+func passwordHash(password string) string {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return string(hash)
+}
 
-// 	err = client.Ping(ctx, readpref.Primary())
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
+//generate userid random cheracter 32 length string
+func generateUserId() string {
+	rand.Seed(time.Now().UnixNano())
+	chars := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	length := 32
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(b)
+}
 
-// 	collection := client.Database("test").Collection("users")
+//generate wallet random cheracter 32 length string for user
+func generateWallet() string {
+	rand.Seed(time.Now().UnixNano())
+	chars := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	length := 32
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(b)
+}
+type Login struct {
+	Email string `json:"email"`
+	Password string `json:"password"`
+}
 
-// 	filter := bson.M{"username": claims["username"]}
-// 	err = collection.FindOne(context.Background(), filter).Decode(&user)
-// 	if err != nil {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-// 		return
-// 	}
-// 	user = User{
-// 		Username: user.Username,
-// 		Password: user.Password,
-// 		Name:     user.Name,
-// 		Age:      user.Age,
-// 		Email:    user.Email,
-// 	}
-// 	c.JSON(http.StatusOK, user)
+type Register struct {
+	Name	 string `json:"name"`
+	Surname  string `json:"surname"`
+	Years	 int	`json:"years"`
+	Phone	 string `json:"phone"`
+	Country string `json:"country"`
+	Email	 string `json:"email"`
+	Password string `json:"password"`
+}
 
-// }
-
-
-// func users(c *gin.Context) {
-// 	token := c.Request.Header.Get("Authorization")
-// 	token = token[7:len(token)]
-// 	claims := jwt.MapClaims{}
-// 	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-// 		return []byte(os.Getenv("SECRET")), nil
-// 	})
-// 	if err != nil {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-// 		return
-// 	}
-// 	var users []User
-// 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-// 	err = client.Connect(ctx)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	err = client.Ping(ctx, readpref.Primary())
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	collection := client.Database("test").Collection("users")
-
-// 	cursor, err := collection.Find(context.Background(), bson.M{})
-// 	if err != nil {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-// 		return
-// 	}
-
-// 	for cursor.Next(context.Background()) {
-// 		var user User
-// 		cursor.Decode(&user)
-// 		user = User{
-// 			Username: user.Username,
-// 			Password: user.Password,
-// 			Name:     user.Name,
-// 			Age:      user.Age,
-// 			Email:    user.Email,
-// 		}
-		
-// 		users = append(users, user)
-
-// 	}
-// 	c.JSON(http.StatusOK, users)
-// }
-
-// func deleteUser(c *gin.Context) {
-// 	token := c.Request.Header.Get("Authorization")
-// 	token = token[7:len(token)]
-// 	claims := jwt.MapClaims{}
-// 	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-// 		return []byte(os.Getenv("SECRET")), nil
-// 	})
-// 	if err != nil {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-// 		return
-// 	}
-// 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	ctx, _:= context.WithTimeout(context.Background(), 10*time.Second)
-// 	err = client.Connect(ctx)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	err = client.Ping(ctx, readpref.Primary())
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	collection := client.Database("test").Collection("users")
-
-// 	filter := bson.M{"username": claims["username"]}
-// 	_, err = collection.DeleteOne(context.Background(), filter)
-// 	if err != nil {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-// 		return
-// 	}
-// 	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User deleted"})
-// }
-
-// func login(c *gin.Context) {
-// 	var user User
-// 	c.BindJSON(&user)
-// 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-// 	err = client.Connect(ctx)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	err = client.Ping(ctx, readpref.Primary())
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-
-// 	collection := client.Database("test").Collection("users")
-
-// 	filter := bson.M{"email": user.Email}
-// 	err = collection.FindOne(context.Background(), filter).Decode(&user)
-// 	if err != nil {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-// 		return
-// 	}
-// 	if user.Password != user.Password {
-// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-// 		return
-// 	}
-// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-// 		"username": user.Username,
-// 		"password": user.Password,
-// 		"name":     user.Name,
-// 		"age":      user.Age,
-// 		"email":    user.Email,
-// 	})
-// 	tokenString, err := token.SignedString([]byte(os.Getenv("SECRET")))
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-// 	c.JSON(http.StatusOK, gin.H{"token": tokenString})
-// }
-
-// func createToken(username string) string {
-// 	claims := jwt.MapClaims{}
-// 	claims["authorized"] = true
-// 	claims["email"] = username
-// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-// 	tokenString, _ := token.SignedString([]byte(os.Getenv("SECRET")))
-// 	return tokenString
-// }
+func register(c *gin.Context) {
+	var register Register
+	c.BindJSON(&register)
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer client.Disconnect(ctx)
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+	collection := client.Database("Partners").Collection("users")
+	var user User
+	err = collection.FindOne(ctx, bson.M{"email": register.Email}).Decode(&user)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if user.Email == register.Email {
+		c.JSON(http.StatusConflict, gin.H{"status": http.StatusConflict, "message": "User already exists"})
+		return
+	}
+	hash := passwordHash(register.Password)
+	userId := generateUserId()
+	wallet := generateWallet()
+	user = User{
+		Name: register.Name,
+		Surname: register.Surname,
+		Years: register.Years,
+		Phone: register.Phone,
+		Country: register.Country,
+		Email: register.Email,
+		Password: hash,
+		RegisterDate: time.Now().Format("2006-01-02 15:04:05"),
+		Money: 0,
+		Promocode: "",
+		Verified: false,
+		Blocked: false,
+		Token: createToken(register.Email),
+		UserId: userId,
+		UserStatus: "user",
+		UserRole: "user",
+		UserAvatar: "",
+		Wallet: wallet,
+	}
+	_, err = collection.InsertOne(ctx, user)
+	if err != nil {
+		fmt.Println(err)
+	}
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User created successfully", "data": user})
+	return 
+}
