@@ -29,7 +29,7 @@ type User struct {
 	Email        string `json:"email"`
 	Password     string `json:"password"`
 	RegisterDate string `json:"register_date"`
-	Money        int64    `json:"money"`
+	Money        int64  `json:"money"`
 	Promocode    string `json:"promocode"`
 	Verified     bool   `json:"verified"`
 	Blocked      bool   `json:"blocked"`
@@ -108,7 +108,8 @@ func main() {
 	router.POST("/updatePassword", updatePassword)
 	router.POST("/updateBlockedStatus", updateBlockedStatus)
 	router.POST("/checkWallet", checkWallet)
-
+	//resend verification code
+	router.POST("/resendVerificationCode", resendVerificationCode)
 	router.Run(":8080")
 }
 
@@ -240,15 +241,16 @@ func register(c *gin.Context) {
 		UserRole:     "user",
 		UserAvatar:   "",
 		Wallet:       wallet,
-		UserRating:  0,
+		UserRating:   0,
 	}
 	_, err = collection.InsertOne(ctx, user)
 	if err != nil {
 		fmt.Println(err)
 	}
 	//return user token, user id, user role, user status
-	sendMailSimple(register.Email, randomCode())
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User created", "token": user.Token, "user_id": user.UserId, "user_role": user.UserRole, "user_status": user.UserStatus})
+	code := randomCode()
+	sendMailSimple(register.Email, code)
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User created", "token": user.Token, "user_id": user.UserId, "user_role": user.UserRole, "user_status": user.UserStatus, "verify_code": code})
 }
 
 func login(c *gin.Context) {
@@ -348,6 +350,57 @@ func verifyUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User verified"})
 }
 
+func resendVerificationCode(c *gin.Context) {
+	var user User
+	c.BindJSON(&user)
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if nx != nil {
+		fmt.Println(nx)
+	}
+	defer client.Disconnect(ctx)
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+	collection := client.Database("Partners").Collection("users")
+	filter := bson.M{"email": user.Email}
+
+	var result User
+	err = collection.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if result.Email == "" {
+		c.JSON(http.StatusNotFound, gin.H{"status": http.StatusNotFound, "message": "User not found"})
+		return
+	}
+	if result.Verified {
+		c.JSON(http.StatusConflict, gin.H{"status": http.StatusConflict, "message": "User already verified"})
+		return
+	}
+	if result.Blocked {
+		c.JSON(http.StatusForbidden, gin.H{"status": http.StatusForbidden, "message": "User blocked"})
+		return
+	}
+	if !result.Verified {
+		code := randomCode()
+		sendMailSimple(result.Email, code)
+		c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "Verification code sent", "verify_code": code})
+		return
+	} else {
+		c.JSON(http.StatusConflict, gin.H{"status": http.StatusConflict, "message": "User already verified"})
+		return
+	}
+}
+
 func getAllUsers(c *gin.Context) {
 	var users []User
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
@@ -418,10 +471,10 @@ func getUser(c *gin.Context) {
 }
 
 func CheckPasswordHash(password, hash string) bool {
-    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	fmt.Println(err)
 
-    return err == nil
+	return err == nil
 }
 
 func updatePassword(c *gin.Context) {
@@ -519,7 +572,7 @@ func updateBlockedStatus(c *gin.Context) {
 	collection := client.Database("Partners").Collection("users")
 	filter := bson.M{"email": user.Email}
 	var result User
-	err = collection.FindOne(ctx, filter ).Decode(&result)
+	err = collection.FindOne(ctx, filter).Decode(&result)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -532,7 +585,7 @@ func updateBlockedStatus(c *gin.Context) {
 		return
 	}
 	update := bson.M{"$set": bson.M{"blocked": user.Blocked}}
-	_, err = collection.UpdateOne(ctx, filter , update)
+	_, err = collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -540,7 +593,7 @@ func updateBlockedStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User blocked status updated", "blocked": user.Blocked})
 }
 
-//post wallet get user name and surname
+// post wallet get user name and surname
 func checkWallet(c *gin.Context) {
 	token := c.Request.Header.Get("Authorization")
 	token = token[7:]
