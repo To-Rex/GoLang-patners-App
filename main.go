@@ -1,4 +1,4 @@
-package main
+ package main
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"golang.org/x/crypto/bcrypt"
+	"github.com/trycourier/courier-go/v2"
 )
 
 const uri = "mongodb+srv://root:1234@cluster0.ik76ncs.mongodb.net/?retryWrites=true&w=majority"
@@ -76,6 +77,8 @@ type Order struct {
 func main() {
 	router := gin.Default()
 	router.POST("/register", register)
+	router.POST("/login", login)
+	router.POST("/verifyUser", verifyUser)
 	router.Run(":8080")
 }
 
@@ -134,6 +137,41 @@ type Register struct {
 	Password string `json:"password"`
 }
 
+func randomCode() string {
+	//random int code 6	length number
+	rand.Seed(time.Now().UnixNano())
+	chars := []rune("0123456789")
+	length := 6
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(b)
+}
+
+func sendMailSimple(email string, code string) {
+	client := courier.CreateClient("pk_prod_K10S0E6XF2MSA5MFK6E33ECTFJ9M", nil)
+	requestID, err := client.SendMessage(
+		context.Background(),
+		courier.SendMessageRequestBody{
+			Message: map[string]interface{}{
+				"to": map[string]string{
+					"email": email,
+				},
+				"template": "K4PMX20GEM4121GAFQJBH30JSSGD",
+				"data": map[string]string{
+					"recipientName": code,
+				},
+			},
+		},
+	)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(requestID)
+	}
+}
+
 func register(c *gin.Context) {
 	var register Register
 	c.BindJSON(&register)
@@ -188,6 +226,98 @@ func register(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User created successfully", "data": user})
-	return 
+	//return user token, user id, user role, user status
+	sendMailSimple(register.Email, randomCode())
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User created", "token": user.Token, "user_id": user.UserId, "user_role": user.UserRole, "user_status": user.UserStatus})
 }
+
+func login(c *gin.Context) {
+	var login Login
+	c.BindJSON(&login)
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer client.Disconnect(ctx)
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+	collection := client.Database("Partners").Collection("users")
+	var user User
+	err = collection.FindOne(ctx, bson.M{"email": login.Email}).Decode(&user)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if user.Email == "" {
+		c.JSON(http.StatusNotFound, gin.H{"status": http.StatusNotFound, "message": "User not found"})
+		return
+	}
+	if user.Blocked {
+		c.JSON(http.StatusForbidden, gin.H{"status": http.StatusForbidden, "message": "User blocked"})
+		return
+	}
+	if !user.Verified {
+		c.JSON(http.StatusForbidden, gin.H{"status": http.StatusForbidden, "message": "User not verified"})
+		return
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(login.Password))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"status": http.StatusUnauthorized, "message": "Invalid credentials"})
+		return
+	}
+	//return user token, user id, user role, user status
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User logged in", "token": user.Token, "user_id": user.UserId, "user_role": user.UserRole, "user_status": user.UserStatus,"wallet":user.Wallet})
+}
+
+func verifyUser(c *gin.Context) {
+	var user User
+	c.BindJSON(&user)
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer client.Disconnect(ctx)
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+	collection := client.Database("Partners").Collection("users")
+	filter := bson.M{"email": user.Email}
+	
+	var result User
+	err = collection.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if result.Email == "" {
+		c.JSON(http.StatusNotFound, gin.H{"status": http.StatusNotFound, "message": "User not found"})
+		return
+	}
+	if result.Verified {
+		c.JSON(http.StatusConflict, gin.H{"status": http.StatusConflict, "message": "User already verified"})
+		return
+	}
+	if result.Blocked {
+		c.JSON(http.StatusForbidden, gin.H{"status": http.StatusForbidden, "message": "User blocked"})
+		return
+	}
+	if !result.Verified{
+		update := bson.M{"$set": bson.M{"verified": true}}
+		_, err = collection.UpdateOne(ctx, filter, update)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User verified"})
+}	
