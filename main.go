@@ -29,7 +29,7 @@ type User struct {
 	Email        string `json:"email"`
 	Password     string `json:"password"`
 	RegisterDate string `json:"register_date"`
-	Money        int    `json:"money"`
+	Money        int64    `json:"money"`
 	Promocode    string `json:"promocode"`
 	Verified     bool   `json:"verified"`
 	Blocked      bool   `json:"blocked"`
@@ -76,6 +76,28 @@ type Order struct {
 	OrderProductCurrency string `json:"order_product_currency"`
 }
 
+type Login struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type Register struct {
+	Name     string `json:"name"`
+	Surname  string `json:"surname"`
+	Years    int    `json:"years"`
+	Phone    string `json:"phone"`
+	Country  string `json:"country"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type UpdatePassword struct {
+	Email          string `json:"email"`
+	Password       string `json:"password"`
+	NewPassword    string `json:"new_password"`
+	RepeatPassword string `json:"repeat_password"`
+}
+
 func main() {
 	router := gin.Default()
 	router.POST("/register", register)
@@ -85,6 +107,8 @@ func main() {
 	router.POST("/getUser", getUser)
 	router.POST("/updatePassword", updatePassword)
 	router.POST("/updateBlockedStatus", updateBlockedStatus)
+	router.POST("/checkWallet", checkWallet)
+
 	router.Run(":8080")
 }
 
@@ -127,28 +151,6 @@ func generateWallet() string {
 		b[i] = chars[rand.Intn(len(chars))]
 	}
 	return string(b)
-}
-
-type Login struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type Register struct {
-	Name     string `json:"name"`
-	Surname  string `json:"surname"`
-	Years    int    `json:"years"`
-	Phone    string `json:"phone"`
-	Country  string `json:"country"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type UpdatePassword struct {
-	Email          string `json:"email"`
-	Password       string `json:"password"`
-	NewPassword    string `json:"new_password"`
-	RepeatPassword string `json:"repeat_password"`
 }
 
 func randomCode() string {
@@ -513,5 +515,50 @@ func updateBlockedStatus(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User blocked status updated"})
+	// if user blocked true return user blocked status true else return false
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User blocked status updated", "blocked": user.Blocked})
+}
+
+//post wallet get user name and surname
+func checkWallet(c *gin.Context) {
+	token := c.Request.Header.Get("Authorization")
+	token = token[7:]
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("SECRET")), nil
+	})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+		
+	}
+	fmt.Println(nx)
+	defer client.Disconnect(ctx)
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+	collection := client.Database("Partners").Collection("users")
+	var wallet User
+	c.BindJSON(&wallet)
+	filter := bson.M{"wallet": wallet.Wallet}
+	var result User
+	err = collection.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if result.Email == "" {
+		c.JSON(http.StatusNotFound, gin.H{"status": http.StatusNotFound, "message": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User found", "name": result.Name, "surname": result.Surname})
 }
