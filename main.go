@@ -195,10 +195,13 @@ func register(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
+	}
+	if nx != nil {
+		fmt.Println(nx)
 	}
 	defer client.Disconnect(ctx)
 	err = client.Ping(ctx, readpref.Primary())
@@ -255,10 +258,13 @@ func login(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
+	}
+	if nx != nil {
+		fmt.Println(nx)
 	}
 	defer client.Disconnect(ctx)
 	err = client.Ping(ctx, readpref.Primary())
@@ -299,10 +305,13 @@ func verifyUser(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
+	}
+	if nx != nil {
+		fmt.Println(nx)
 	}
 	defer client.Disconnect(ctx)
 	err = client.Ping(ctx, readpref.Primary())
@@ -345,10 +354,13 @@ func getAllUsers(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
+	}
+	if nx != nil {
+		fmt.Println(nx)
 	}
 	defer client.Disconnect(ctx)
 	err = client.Ping(ctx, readpref.Primary())
@@ -379,10 +391,13 @@ func getUser(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
+	}
+	if nx != nil {
+		fmt.Println(nx)
 	}
 	defer client.Disconnect(ctx)
 	err = client.Ping(ctx, readpref.Primary())
@@ -411,7 +426,7 @@ func CheckPasswordHash(password, hash string) bool {
 
 func updatePassword(c *gin.Context) {
 	token := c.Request.Header.Get("Authorization")
-	token = token[7:len(token)]
+	token = token[7:]
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("SECRET")), nil
@@ -424,10 +439,13 @@ func updatePassword(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
+	}
+	if nx != nil {
+		fmt.Println(nx)
 	}
 	defer client.Disconnect(ctx)
 	err = client.Ping(ctx, readpref.Primary())
@@ -485,10 +503,13 @@ func updateBlockedStatus(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, nx := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
+	}
+	if nx != nil {
+		fmt.Println(nx)
 	}
 	defer client.Disconnect(ctx)
 	err = client.Ping(ctx, readpref.Primary())
@@ -539,9 +560,10 @@ func checkWallet(c *gin.Context) {
 	err = client.Connect(ctx)
 	if err != nil {
 		fmt.Println(err)
-		
 	}
-	fmt.Println(nx)
+	if nx != nil {
+		fmt.Println(nx)
+	}
 	defer client.Disconnect(ctx)
 	err = client.Ping(ctx, readpref.Primary())
 	if err != nil {
