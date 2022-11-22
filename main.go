@@ -39,6 +39,7 @@ type User struct {
 	UserRole     string `json:"user_role"`
 	UserAvatar   string `json:"user_avatar"`
 	Wallet       string `json:"wallet"`
+	UserRating   int    `json:"user_rating"`
 }
 
 type Transaction struct {
@@ -83,6 +84,7 @@ func main() {
 	router.POST("/getAllUsers", getAllUsers)
 	router.POST("/getUser", getUser)
 	router.POST("/updatePassword", updatePassword)
+	router.POST("/updateBlockedStatus", updateBlockedStatus)
 	router.Run(":8080")
 }
 
@@ -222,7 +224,7 @@ func register(c *gin.Context) {
 		Country:      register.Country,
 		Email:        register.Email,
 		Password:     hash,
-		RegisterDate: time.Now().Format("2006-01-02 15:04:05"),
+		RegisterDate: time.Now().Format("2003-03-31 15:04:05"),
 		Money:        0,
 		Promocode:    "",
 		Verified:     false,
@@ -233,6 +235,7 @@ func register(c *gin.Context) {
 		UserRole:     "user",
 		UserAvatar:   "",
 		Wallet:       wallet,
+		UserRating:  0,
 	}
 	_, err = collection.InsertOne(ctx, user)
 	if err != nil {
@@ -450,7 +453,7 @@ func updatePassword(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"status": http.StatusForbidden, "message": "User not verified"})
 		return
 	}
-	
+
 	if updatePassword.NewPassword != updatePassword.RepeatPassword {
 		c.JSON(http.StatusConflict, gin.H{"status": http.StatusConflict, "message": "Passwords don't match"})
 		return
@@ -470,4 +473,45 @@ func updatePassword(c *gin.Context) {
 		fmt.Println(err)
 	}
 	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "Password updated"})
+}
+
+func updateBlockedStatus(c *gin.Context) {
+	//no bearer token
+	var user User
+	c.BindJSON(&user)
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	if err != nil {
+		fmt.Println(err)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer client.Disconnect(ctx)
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		fmt.Println(err)
+	}
+	collection := client.Database("Partners").Collection("users")
+	filter := bson.M{"email": user.Email}
+	var result User
+	err = collection.FindOne(ctx, filter ).Decode(&result)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if result.Email == "" {
+		c.JSON(http.StatusNotFound, gin.H{"status": http.StatusNotFound, "message": "User not found"})
+		return
+	}
+	if result.UserRole == "creator" {
+		c.JSON(http.StatusForbidden, gin.H{"status": http.StatusForbidden, "message": "User is creator"})
+		return
+	}
+	update := bson.M{"$set": bson.M{"blocked": user.Blocked}}
+	_, err = collection.UpdateOne(ctx, filter , update)
+	if err != nil {
+		fmt.Println(err)
+	}
+	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User blocked status updated"})
 }
