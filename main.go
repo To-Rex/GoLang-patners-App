@@ -637,3 +637,4 @@ func checkWallet(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": http.StatusOK, "message": "User found", "name": result.Name, "surname": result.Surname})
 }
+
